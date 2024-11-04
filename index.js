@@ -41,7 +41,7 @@ if (!region) {
   console.log("Error. Environment variable region is not defined");
 }
 
-const indexPrefix = process.env["index"] || "elblogs";
+const indexPrefix = process.env["INDEX_PREFIX"] + "-";
 const index = indexPrefix + "-" + indexTimestamp; // adds a timestamp to index. Example: elblogs-2016.03.31
 const doctype = process.env["doctype"] || "elb-access-logs";
 
