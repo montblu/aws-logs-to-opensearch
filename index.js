@@ -18,7 +18,8 @@
 /* Imports */
 var AWS = require("aws-sdk");
 var LineStream = require("byline").LineStream;
-var parse = require("alb-log-parser"); // https://github.com/igtm/node-alb-log-parser
+var AlbLogParser = require("alb-log-parser"); // alb-log-parser  https://github.com/igtm/node-alb-log-parser
+var VpcFlowLogParser = require("vpc-flow-log-parser"); // vpc-flow-log-parser  https://github.com/toshihirock/node-vpc-flow-log-parser
 var path = require("path");
 var stream = require("stream");
 const zlib = require("zlib");
