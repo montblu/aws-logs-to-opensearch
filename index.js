@@ -164,10 +164,10 @@ exports.handler = function (event, context) {
   var objPath = event.Records.s3.object.key;
   if (objPath.includes("elasticloadbalancing")) {
     console.log("Processing ALB log file");
-    var parser = AlbLogParser;
+    var parse = AlbLogParser;
   } else if (objPath.includes("vpcflowlogs/")) {
     console.log("Processing VPC Flow log file");
-    var parser = VpcFlowLogParser;
+    var parse = VpcFlowLogParser;
   } else {
     console.log("Unknown log file type");
     context.fail();
