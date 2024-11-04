@@ -161,7 +161,7 @@ exports.handler = function (event, context) {
   console.log("Received event: ", JSON.stringify(event, null, 2));
 
   // Get the type of log file depending on the path of the object
-  var objPath = event.Records.s3.object.key;
+  var objPath = event.Records[0].s3.object.key;
   if (objPath.includes("elasticloadbalancing")) {
     console.log("Processing ALB log file");
     var parse = AlbLogParser;
