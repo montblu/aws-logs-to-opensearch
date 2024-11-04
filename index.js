@@ -16,35 +16,38 @@
  */
 
 /* Imports */
-var AWS = require('aws-sdk');
-var LineStream = require('byline').LineStream;
-var parse = require('alb-log-parser');  // alb-log-parser  https://github.com/igtm/node-alb-log-parser
-var path = require('path');
-var stream = require('stream');
-const zlib = require('zlib');
+var AWS = require("aws-sdk");
+var LineStream = require("byline").LineStream;
+var parse = require("alb-log-parser"); // https://github.com/igtm/node-alb-log-parser
+var path = require("path");
+var stream = require("stream");
+const zlib = require("zlib");
 
-var indexTimestamp = new Date().toISOString().replace(/\-/g, '.').replace(/T.+/, '');
-const esEndpoint = process.env['es_endpoint'];
-var endpoint = '';
+var indexTimestamp = new Date()
+  .toISOString()
+  .replace(/\-/g, ".")
+  .replace(/T.+/, "");
+const esEndpoint = process.env["es_endpoint"];
+var endpoint = "";
 if (!esEndpoint) {
-  console.log('ERROR: Environment variable es_endpoint not set');
+  console.log("ERROR: Environment variable es_endpoint not set");
 } else {
-  endpoint =  new AWS.Endpoint(esEndpoint);
+  endpoint = new AWS.Endpoint(esEndpoint);
 }
 
-const region = process.env['region'];
+const region = process.env["region"];
 if (!region) {
-    console.log("Error. Environment variable region is not defined")
+  console.log("Error. Environment variable region is not defined");
 }
 
-const indexPrefix = process.env['index'] || 'elblogs';
-const index = indexPrefix + '-' + indexTimestamp; // adds a timestamp to index. Example: elblogs-2016.03.31
-const doctype = process.env['doctype'] || 'elb-access-logs';
+const indexPrefix = process.env["index"] || "elblogs";
+const index = indexPrefix + "-" + indexTimestamp; // adds a timestamp to index. Example: elblogs-2016.03.31
+const doctype = process.env["doctype"] || "elb-access-logs";
 
 /* Globals */
 var s3 = new AWS.S3();
-var totLogLines = 0;    // Total number of log lines in the file
-var numDocsAdded = 0;   // Number of log lines added to ES so far
+var totLogLines = 0; // Total number of log lines in the file
+var numDocsAdded = 0; // Number of log lines added to ES so far
 
 /*
  * The AWS credentials are picked up from the environment.
@@ -53,39 +56,44 @@ var numDocsAdded = 0;   // Number of log lines added to ES so far
  * make sure to apply a policy that permits ES domain operations
  * to the role.
  */
-var creds = new AWS.EnvironmentCredentials('AWS');
+var creds = new AWS.EnvironmentCredentials("AWS");
 
-console.log('Initializing AWS Lambda Function');
+console.log("Initializing AWS Lambda Function");
 
 /*
  * Get the log file from the given S3 bucket and key.  Parse it and add
  * each log record to the ES domain.
  */
 function s3LogsToES(bucket, key, context, lineStream, recordStream) {
-    // Note: The Lambda function should be configured to filter for .log files
-    // (as part of the Event Source "suffix" setting).
-    if (!esEndpoint) {
-      var error = new Error('ERROR: Environment variable es_endpoint not set')
-      context.fail(error);
-    }
+  // Note: The Lambda function should be configured to filter for .log files
+  // (as part of the Event Source "suffix" setting).
+  if (!esEndpoint) {
+    var error = new Error("ERROR: Environment variable es_endpoint not set");
+    context.fail(error);
+  }
 
-    var s3Stream = s3.getObject({Bucket: bucket, Key: key}).createReadStream();
+  var s3Stream = s3.getObject({ Bucket: bucket, Key: key }).createReadStream();
 
-    // Flow: S3 file stream -> Log Line stream -> Log Record stream -> ES
-     s3Stream
-      .pipe(zlib.createGunzip())
-      .pipe(lineStream)
-      .pipe(recordStream)
-      .on('data', function(parsedEntry) {
-            postDocumentToES(parsedEntry, context);
-      });
-
-    s3Stream.on('error', function() {
-        console.log(
-            'Error getting object "' + key + '" from bucket "' + bucket + '".  ' +
-            'Make sure they exist and your bucket is in the same region as this function.');
-        context.fail();
+  // Flow: S3 file stream -> Log Line stream -> Log Record stream -> ES
+  s3Stream
+    .pipe(zlib.createGunzip())
+    .pipe(lineStream)
+    .pipe(recordStream)
+    .on("data", function (parsedEntry) {
+      postDocumentToES(parsedEntry, context);
     });
+
+  s3Stream.on("error", function () {
+    console.log(
+      'Error getting object "' +
+        key +
+        '" from bucket "' +
+        bucket +
+        '".  ' +
+        "Make sure they exist and your bucket is in the same region as this function.",
+    );
+    context.fail();
+  });
 }
 
 /*
@@ -94,68 +102,83 @@ function s3LogsToES(bucket, key, context, lineStream, recordStream) {
  * (using the "context" parameter).
  */
 function postDocumentToES(doc, context) {
-    var req = new AWS.HttpRequest(endpoint);
+  var req = new AWS.HttpRequest(endpoint);
 
-    req.method = 'POST';
-    req.path = path.join('/', index, doctype);
-    req.region = region;
-    req.body = doc;
-    req.headers['presigned-expires'] = false;
-    req.headers['Host'] = endpoint.host;
-    // needed to make it work with ES 6.x
-    // https://www.elastic.co/blog/strict-content-type-checking-for-elasticsearch-rest-requests
-    req.headers['Content-Type'] = 'application/json';
+  req.method = "POST";
+  req.path = path.join("/", index, doctype);
+  req.region = region;
+  req.body = doc;
+  req.headers["presigned-expires"] = false;
+  req.headers["Host"] = endpoint.host;
+  // needed to make it work with ES 6.x
+  // https://www.elastic.co/blog/strict-content-type-checking-for-elasticsearch-rest-requests
+  req.headers["Content-Type"] = "application/json";
 
-    // Sign the request (Sigv4)
-    var signer = new AWS.Signers.V4(req, 'es');
-    signer.addAuthorization(creds, new Date());
+  // Sign the request (Sigv4)
+  var signer = new AWS.Signers.V4(req, "es");
+  signer.addAuthorization(creds, new Date());
 
-    // Post document to ES
-    var send = new AWS.NodeHttpClient();
-    send.handleRequest(req, null, function(httpResp) {
-        var body = '';
-        httpResp.on('data', function (chunk) {
-            body += chunk;
-        });
-        httpResp.on('end', function (chunk) {
-            numDocsAdded ++;
-            if (numDocsAdded === totLogLines) {
-                // Mark lambda success.  If not done so, it will be retried.
-                console.log('All ' + numDocsAdded + ' log records added to index ' + index + ' in region ' + region + '.');
-                context.succeed();
-            }
-        });
-    }, function(err) {
-        console.log('Error: ' + err);
-        console.log(numDocsAdded + 'of ' + totLogLines + ' log records added to ES.');
-        context.fail();
-    });
+  // Post document to ES
+  var send = new AWS.NodeHttpClient();
+  send.handleRequest(
+    req,
+    null,
+    function (httpResp) {
+      var body = "";
+      httpResp.on("data", function (chunk) {
+        body += chunk;
+      });
+      httpResp.on("end", function (chunk) {
+        numDocsAdded++;
+        if (numDocsAdded === totLogLines) {
+          // Mark lambda success.  If not done so, it will be retried.
+          console.log(
+            "All " +
+              numDocsAdded +
+              " log records added to index " +
+              index +
+              " in region " +
+              region +
+              ".",
+          );
+          context.succeed();
+        }
+      });
+    },
+    function (err) {
+      console.log("Error: " + err);
+      console.log(
+        numDocsAdded + "of " + totLogLines + " log records added to ES.",
+      );
+      context.fail();
+    },
+  );
 }
 
 /* Lambda "main": Execution starts here */
-exports.handler = function(event, context) {
-    console.log('Received event: ', JSON.stringify(event, null, 2));
+exports.handler = function (event, context) {
+  console.log("Received event: ", JSON.stringify(event, null, 2));
 
-    /* == Streams ==
-    * To avoid loading an entire (typically large) log file into memory,
-    * this is implemented as a pipeline of filters, streaming log data
-    * from S3 to ES.
-    * Flow: S3 file stream -> Log Line stream -> Log Record stream -> ES
-    */
-    var lineStream = new LineStream();
-    // A stream of log records, from parsing each log line
-    var recordStream = new stream.Transform({objectMode: true})
-    recordStream._transform = function(line, encoding, done) {
-        var logRecord = parse(line.toString());
-        var serializedRecord = JSON.stringify(logRecord);
-        this.push(serializedRecord);
-        totLogLines ++;
-        done();
-    }
+  /* == Streams ==
+   * To avoid loading an entire (typically large) log file into memory,
+   * this is implemented as a pipeline of filters, streaming log data
+   * from S3 to ES.
+   * Flow: S3 file stream -> Log Line stream -> Log Record stream -> ES
+   */
+  var lineStream = new LineStream();
+  // A stream of log records, from parsing each log line
+  var recordStream = new stream.Transform({ objectMode: true });
+  recordStream._transform = function (line, encoding, done) {
+    var logRecord = parse(line.toString());
+    var serializedRecord = JSON.stringify(logRecord);
+    this.push(serializedRecord);
+    totLogLines++;
+    done();
+  };
 
-    event.Records.forEach(function(record) {
-        var bucket = record.s3.bucket.name;
-        var objKey = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
-        s3LogsToES(bucket, objKey, context, lineStream, recordStream);
-    });
-}
+  event.Records.forEach(function (record) {
+    var bucket = record.s3.bucket.name;
+    var objKey = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
+    s3LogsToES(bucket, objKey, context, lineStream, recordStream);
+  });
+};
