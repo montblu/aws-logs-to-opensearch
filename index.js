@@ -160,6 +160,19 @@ function postDocumentToES(doc, context) {
 exports.handler = function (event, context) {
   console.log("Received event: ", JSON.stringify(event, null, 2));
 
+  // Get the type of log file depending on the path of the object
+  var objPath = event.Records.s3.object.key;
+  if (objPath.includes("elasticloadbalancing")) {
+    console.log("Processing ALB log file");
+    var parser = AlbLogParser;
+  } else if (objPath.includes("vpcflowlogs/")) {
+    console.log("Processing VPC Flow log file");
+    var parser = VpcFlowLogParser;
+  } else {
+    console.log("Unknown log file type");
+    context.fail();
+  }
+
   /* == Streams ==
    * To avoid loading an entire (typically large) log file into memory,
    * this is implemented as a pipeline of filters, streaming log data
