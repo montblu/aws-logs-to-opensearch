@@ -13,7 +13,8 @@
     "aws-sdk": "^2.1091.0",
     "byline": "4.2.1",
     "path": "0.12.7",
-    "stream": "0.0.2"
+    "stream": "0.0.2",
+    "vpc-flow-log-parser": "^0.0.3"
   },
   "repository": "https://github.com/blmr/aws-elb-logs-to-elasticsearch.git",
   "license": "Amazon Software License"
