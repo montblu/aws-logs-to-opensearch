@@ -46,6 +46,8 @@ if (!indexPrefix) {
   console.log("Error. Environment variable INDEX_PREFIX is not defined");
 }
 
+var logType;
+
 /* Globals */
 var s3 = new AWS.S3();
 var totLogLines = 0; // Total number of log lines in the file
