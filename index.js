@@ -42,8 +42,7 @@ if (!region) {
 }
 
 const indexPrefix = process.env["INDEX_PREFIX"] + "-";
-const index = indexPrefix + "-" + indexTimestamp; // adds a timestamp to index. Example: elblogs-2016.03.31
-const doctype = process.env["doctype"] || "elb-access-logs";
+const indexSuffix = "-" + indexTimestamp; // adds a timestamp to index.1
 
 /* Globals */
 var s3 = new AWS.S3();
