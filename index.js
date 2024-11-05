@@ -41,12 +41,37 @@ if (!region) {
   console.log("Error. Environment variable region is not defined");
 }
 
+var index;
 const indexPrefix = process.env["INDEX_PREFIX"];
 if (!indexPrefix) {
   console.log("Error. Environment variable INDEX_PREFIX is not defined");
 }
 
 var logType;
+function getLogType(objPath) {
+  if (objPath.includes("elasticloadbalancing")) {
+    console.log("Processing ALB log file");
+    return "alb";
+  } else if (objPath.includes("vpcflowlogs")) {
+    console.log("Processing VPC Flow log file");
+    return "vpc";
+  } else {
+    console.log("Unknown log file type");
+    context.fail();
+  }
+}
+
+var parser;
+function getParser(logType) {
+  if (logType === "alb") {
+    return AlbLogParser;
+  } else if (logType === "vpc") {
+    return VpcFlowLogParser;
+  } else {
+    console.log("Unknown log type");
+    context.fail();
+  }
+}
 
 /* Globals */
 var s3 = new AWS.S3();
@@ -163,18 +188,15 @@ function postDocumentToES(doc, context) {
 exports.handler = function (event, context) {
   console.log("Received event: ", JSON.stringify(event, null, 2));
 
-  // Get the type of log file depending on the path of the object
+  // Set the log type variable depending on the path of the object
   var objPath = event.Records[0].s3.object.key;
-  if (objPath.includes("elasticloadbalancing")) {
-    console.log("Processing ALB log file");
-    var parse = AlbLogParser;
-  } else if (objPath.includes("vpcflowlogs/")) {
-    console.log("Processing VPC Flow log file");
-    var parse = VpcFlowLogParser;
-  } else {
-    console.log("Unknown log file type");
-    context.fail();
-  }
+  logType = getLogType(objPath);
+
+  // Set parser
+  parser = getParser(logType);
+
+  // Set the index name
+  index = indexPrefix + "-" + logType + "-" + indexTimestamp;
 
   /* == Streams ==
    * To avoid loading an entire (typically large) log file into memory,
@@ -186,7 +208,7 @@ exports.handler = function (event, context) {
   // A stream of log records, from parsing each log line
   var recordStream = new stream.Transform({ objectMode: true });
   recordStream._transform = function (line, encoding, done) {
-    var logRecord = parse(line.toString());
+    var logRecord = parser(line.toString());
     var serializedRecord = JSON.stringify(logRecord);
     this.push(serializedRecord);
     totLogLines++;
