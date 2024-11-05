@@ -41,8 +41,10 @@ if (!region) {
   console.log("Error. Environment variable region is not defined");
 }
 
-const indexPrefix = process.env["INDEX_PREFIX"] + "-";
-const indexSuffix = "-" + indexTimestamp; // adds a timestamp to index.1
+const indexPrefix = process.env["INDEX_PREFIX"];
+if (!indexPrefix) {
+  console.log("Error. Environment variable INDEX_PREFIX is not defined");
+}
 
 /* Globals */
 var s3 = new AWS.S3();
