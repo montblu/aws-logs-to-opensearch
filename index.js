@@ -73,6 +73,17 @@ function getParser(logType) {
   }
 }
 
+/*
+We want to send only VPC Flow Logs that correspond to a specific port.
+Otherwise, we will send all the logs of the VPC
+*/
+var VPCFlowLogsPort = process.env["VPC_SEND_ONLY_LOGS_WITH_PORT"];
+if (VPCFlowLogsPort) {
+  console.log(
+    "Sending only VPC Flow Logs with 'dsport': '" + VPCFlowLogsPort + "'",
+  );
+}
+
 /* Globals */
 var s3 = new AWS.S3();
 var totLogLines = 0; // Total number of log lines in the file
