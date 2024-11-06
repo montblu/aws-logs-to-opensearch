@@ -232,9 +232,16 @@ exports.handler = function (event, context) {
       let startDateTime = new Date(logRecord.start_utc);
       logRecord.timestamp = startDateTime.toISOString();
     }
-    var serializedRecord = JSON.stringify(logRecord);
-    this.push(serializedRecord);
-    totLogLines++;
+    let dstPort = parseInt(logRecord.dstport);
+    if (
+      logType === "alb" ||
+      (logType === "vpc" && !VPCFlowLogsPort) ||
+      (logType === "vpc" && dstPort === destinationPortFilter)
+    ) {
+      var serializedRecord = JSON.stringify(logRecord);
+      this.push(serializedRecord);
+      totLogLines++;
+    }
     done();
   };
 
