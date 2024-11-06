@@ -221,7 +221,7 @@ exports.handler = function (event, context) {
   recordStream._transform = function (line, encoding, done) {
     var logRecord = parser(line.toString());
     // In case of VPC Flow Logs
-    if (logType === "vpc") {
+    if (logType === "vpc" && logRecord.start_utc !== "Invalid date") {
       /*
       We want to add the 'timestamp' field using 'start_utc' value
       as VPC Flow Logs don't log a timestamp. We need this otherwise
