@@ -209,6 +209,16 @@ exports.handler = function (event, context) {
   var recordStream = new stream.Transform({ objectMode: true });
   recordStream._transform = function (line, encoding, done) {
     var logRecord = parser(line.toString());
+    // In case of VPC Flow Logs
+    if (logType === "vpc") {
+      /*
+      We want to add the 'timestamp' field using 'start_utc' value
+      as VPC Flow Logs don't log a timestamp. We need this otherwise
+      OpenSearch will not be able to parse the timestamp field.
+      */
+      let startDateTime = new Date(logRecord.start_utc);
+      logRecord.timestamp = startDateTime.toISOString();
+    }
     var serializedRecord = JSON.stringify(logRecord);
     this.push(serializedRecord);
     totLogLines++;
