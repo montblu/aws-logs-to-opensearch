@@ -78,9 +78,11 @@ We want to send only VPC Flow Logs that correspond to a specific port.
 Otherwise, we will send all the logs of the VPC
 */
 var VPCFlowLogsPort = process.env["VPC_SEND_ONLY_LOGS_WITH_PORT"];
+var destinationPortFilter;
 if (VPCFlowLogsPort) {
+  destinationPortFilter = parseInt(VPCFlowLogsPort);
   console.log(
-    "Sending only VPC Flow Logs with 'dsport': '" + VPCFlowLogsPort + "'",
+    "Sending only VPC Flow Logs with 'dsport': '" + destinationPortFilter + "'",
   );
 }
 
