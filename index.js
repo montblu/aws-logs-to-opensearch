@@ -90,7 +90,6 @@ if (VPCFlowLogsPorts) {
     );
   } catch (e) {
     console.error("Error parsing ports:", e);
-    destinationPortFilters = []; // Optionally, set to an empty array or another default value
   }
 }
 
