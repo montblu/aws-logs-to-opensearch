@@ -84,7 +84,7 @@ if (VPCFlowLogsPorts) {
     // Split the string by comma and map each element to a number
     destinationPortFilters = VPCFlowLogsPorts.split(",").map(Number);
     console.log(
-      "Sending only VPC Flow Logs with 'dsport'= '" +
+      "Sending only VPC Flow Logs with 'dsport' = '" +
         JSON.stringify(destinationPortFilters) +
         "'",
     );
