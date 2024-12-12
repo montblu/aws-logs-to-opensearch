@@ -77,13 +77,21 @@ function getParser(logType) {
 We want to send only VPC Flow Logs that correspond to a specific port.
 Otherwise, we will send all the logs of the VPC
 */
-var VPCFlowLogsPort = process.env["VPC_SEND_ONLY_LOGS_WITH_PORT"];
-var destinationPortFilter;
-if (VPCFlowLogsPort) {
-  destinationPortFilter = parseInt(VPCFlowLogsPort);
-  console.log(
-    "Sending only VPC Flow Logs with 'dsport': '" + destinationPortFilter + "'",
-  );
+var VPCFlowLogsPorts = process.env["VPC_SEND_ONLY_LOGS_WITH_PORTS"];
+var destinationPortFilters;
+if (VPCFlowLogsPorts) {
+  try {
+    // Split the string by comma and map each element to a number
+    destinationPortFilters = VPCFlowLogsPorts.split(",").map(Number);
+    console.log(
+      "Sending only VPC Flow Logs with 'dsport'= '" +
+        JSON.stringify(destinationPortFilters) +
+        "'",
+    );
+  } catch (e) {
+    console.error("Error parsing ports:", e);
+    destinationPortFilters = []; // Optionally, set to an empty array or another default value
+  }
 }
 
 /* Globals */
