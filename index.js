@@ -242,8 +242,8 @@ exports.handler = function (event, context) {
     let dstPort = parseInt(logRecord.dstport);
     if (
       logType === "alb" ||
-      (logType === "vpc" && !VPCFlowLogsPort) ||
-      (logType === "vpc" && dstPort === destinationPortFilter)
+      (logType === "vpc" && !VPCFlowLogsPorts) ||
+      (logType === "vpc" && destinationPortFilters.includes(dstPort))
     ) {
       var serializedRecord = JSON.stringify(logRecord);
       this.push(serializedRecord);
