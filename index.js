@@ -223,14 +223,21 @@ exports.handler = function (event, context) {
   recordStream._transform = function (line, encoding, done) {
     var logRecord = parser(line.toString());
     // In case of VPC Flow Logs
-    if (logType === "vpc" && logRecord.start_utc !== "Invalid date") {
-      /*
+    if (logType === "vpc") {
+      for (let key in logRecord) {
+        if (typeof logRecord[key] === "string" && !isNaN(logRecord[key])) {
+          logRecord[key] = parseInt(logRecord[key], 10);
+        }
+      }
+      if (logRecord.start_utc !== "Invalid date") {
+        /*
       We want to add the 'timestamp' field using 'start_utc' value
       as VPC Flow Logs don't log a timestamp. We need this otherwise
       OpenSearch will not be able to parse the timestamp field.
       */
-      let startDateTime = new Date(logRecord.start_utc);
-      logRecord.timestamp = startDateTime.toISOString();
+        let startDateTime = new Date(logRecord.start_utc);
+        logRecord.timestamp = startDateTime.toISOString();
+      }
     }
     let dstPort = parseInt(logRecord.dstport);
     if (
