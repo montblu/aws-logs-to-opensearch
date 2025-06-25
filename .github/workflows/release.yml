@@ -1,0 +1,33 @@
+name: Release
+
+on:  [ push ]
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          registry-url: "https://npm.pkg.github.com"
+      - name: Get Current Tag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+        id: tag
+      - name: Create archive of build (.tar.gz)
+        uses: sibiraj-s/action-archiver@v1
+        with:
+          working-directory: "./"
+          path: "dist"
+          format: tar
+          gzip: true
+          output: aws-logs-to-opensearch-${{ steps.tag.outputs.tag }}.tar.gz
+      - name: Add artifact to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: aws-logs-to-opensearch-${{ steps.tag.outputs.tag }}.tar.gz
