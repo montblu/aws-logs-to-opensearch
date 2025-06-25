@@ -22,11 +22,13 @@ jobs:
       - name: Create archive of build (.tar.gz)
         uses: sibiraj-s/action-archiver@v1
         with:
-          working-directory: "./"
-          path: "dist"
           format: tar
           gzip: true
           output: aws-logs-to-opensearch-${{ steps.tag.outputs.tag }}.tar.gz
+          path: '**/*'
+          ignore: |
+            **/*.md
+            **/*.yml
       - name: Add artifact to Release
         uses: softprops/action-gh-release@v1
         with:
