@@ -22,10 +22,10 @@ jobs:
       - name: Create archive of build (.tar.gz)
         uses: sibiraj-s/action-archiver@v1
         with:
+          path: '**/*'
           format: tar
           gzip: true
           output: aws-logs-to-opensearch-${{ steps.tag.outputs.tag }}.tar.gz
-          path: '**/*'
           ignore: |
             **/*.md
             **/*.yml
