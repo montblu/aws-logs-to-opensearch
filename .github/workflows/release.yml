@@ -16,6 +16,7 @@ jobs:
         with:
           node-version: 18.x
           registry-url: "https://npm.pkg.github.com"
+      - run: npm install
       - name: Get Current Tag
         uses: WyriHaximus/github-action-get-previous-tag@v1
         id: tag
