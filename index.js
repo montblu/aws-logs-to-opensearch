@@ -244,6 +244,7 @@ exports.handler = function (event, context) {
       */
         let startDateTime = new Date(logRecord.start_utc);
         logRecord.timestamp = startDateTime.toISOString();
+        logRecord.request_creation_time = startDateTime.toISOString();
       }
     }
     let dstPort = parseInt(logRecord.dstport);
