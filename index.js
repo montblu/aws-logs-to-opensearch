@@ -154,7 +154,7 @@ function postDocumentToES(doc, context) {
   var req = new AWS.HttpRequest(endpoint);
 
   req.method = "POST";
-  req.path = path.join("/", index, logType);
+  req.path = path.join("/", index, "_doc");
   req.region = region;
   req.body = doc;
   req.headers["presigned-expires"] = false;
