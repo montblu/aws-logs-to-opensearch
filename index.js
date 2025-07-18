@@ -154,7 +154,7 @@ function postDocumentToES(doc, context) {
   var req = new AWS.HttpRequest(endpoint);
 
   req.method = "POST";
-  req.path = path.join("/", index, logType);
+  req.path = path.join("/", index, "_doc");
   req.region = region;
   req.body = doc;
   req.headers["presigned-expires"] = false;
@@ -244,6 +244,7 @@ exports.handler = function (event, context) {
       */
         let startDateTime = new Date(logRecord.start_utc);
         logRecord.timestamp = startDateTime.toISOString();
+        logRecord.request_creation_time = startDateTime.toISOString();
       }
     }
     let dstPort = parseInt(logRecord.dstport);
