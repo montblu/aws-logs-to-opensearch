@@ -16,7 +16,8 @@
  */
 
 /* Imports */
-var AWS = require("aws-sdk");
+const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { Client } = require('@opensearch-project/opensearch');
 var LineStream = require("byline").LineStream;
 var AlbLogParser = require("alb-log-parser"); // alb-log-parser  https://github.com/igtm/node-alb-log-parser
 var VpcFlowLogParser = require("vpc-flow-log-parser"); // vpc-flow-log-parser  https://github.com/toshihirock/node-vpc-flow-log-parser
@@ -33,7 +34,7 @@ var endpoint = "";
 if (!esEndpoint) {
   console.log("ERROR: Environment variable es_endpoint not set");
 } else {
-  endpoint = new AWS.Endpoint(esEndpoint);
+  endpoint = esEndpoint;
 }
 
 const region = process.env["region"];
@@ -94,7 +95,11 @@ if (VPCFlowLogsPorts) {
 }
 
 /* Globals */
-var s3 = new AWS.S3();
+const s3 = new S3Client({ region });
+const esClient = new Client({
+  node: `https://${endpoint}`,
+  // The client will automatically use AWS credentials from the environment or IAM role
+});
 var totLogLines = 0; // Total number of log lines in the file
 var numDocsAdded = 0; // Number of log lines added to ES so far
 
@@ -105,7 +110,6 @@ var numDocsAdded = 0; // Number of log lines added to ES so far
  * make sure to apply a policy that permits ES domain operations
  * to the role.
  */
-var creds = new AWS.EnvironmentCredentials("AWS");
 
 console.log("Initializing AWS Lambda Function");
 
@@ -113,7 +117,7 @@ console.log("Initializing AWS Lambda Function");
  * Get the log file from the given S3 bucket and key.  Parse it and add
  * each log record to the ES domain.
  */
-function s3LogsToES(bucket, key, context, lineStream, recordStream) {
+async function s3LogsToES(bucket, key, context, lineStream, recordStream) {
   // Note: The Lambda function should be configured to filter for .log files
   // (as part of the Event Source "suffix" setting).
   if (!esEndpoint) {
@@ -121,7 +125,9 @@ function s3LogsToES(bucket, key, context, lineStream, recordStream) {
     context.fail(error);
   }
 
-  var s3Stream = s3.getObject({ Bucket: bucket, Key: key }).createReadStream();
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  const response = await s3.send(command);
+  var s3Stream = response.Body;
 
   // Flow: S3 file stream -> Log Line stream -> Log Record stream -> ES
   s3Stream
@@ -150,58 +156,32 @@ function s3LogsToES(bucket, key, context, lineStream, recordStream) {
  * If all records are successfully added, indicate success to lambda
  * (using the "context" parameter).
  */
-function postDocumentToES(doc, context) {
-  var req = new AWS.HttpRequest(endpoint);
-
-  req.method = "POST";
-  req.path = path.join("/", index, "_doc");
-  req.region = region;
-  req.body = doc;
-  req.headers["presigned-expires"] = false;
-  req.headers["Host"] = endpoint.host;
-  // needed to make it work with ES 6.x
-  // https://www.elastic.co/blog/strict-content-type-checking-for-elasticsearch-rest-requests
-  req.headers["Content-Type"] = "application/json";
-
-  // Sign the request (Sigv4)
-  var signer = new AWS.Signers.V4(req, "es");
-  signer.addAuthorization(creds, new Date());
-
-  // Post document to ES
-  var send = new AWS.NodeHttpClient();
-  send.handleRequest(
-    req,
-    null,
-    function (httpResp) {
-      var body = "";
-      httpResp.on("data", function (chunk) {
-        body += chunk;
-      });
-      httpResp.on("end", function (chunk) {
-        numDocsAdded++;
-        if (numDocsAdded === totLogLines) {
-          // Mark lambda success.  If not done so, it will be retried.
-          console.log(
-            "All " +
-              numDocsAdded +
-              " log records added to index " +
-              index +
-              " in region " +
-              region +
-              ".",
-          );
-          context.succeed();
-        }
-      });
-    },
-    function (err) {
-      console.log("Error: " + err);
+async function postDocumentToES(doc, context) {
+  try {
+    await esClient.index({
+      index: index,
+      body: doc
+    });
+    numDocsAdded++;
+    if (numDocsAdded === totLogLines) {
       console.log(
-        numDocsAdded + "of " + totLogLines + " log records added to ES.",
+        "All " +
+          numDocsAdded +
+          " log records added to index " +
+          index +
+          " in region " +
+          region +
+          ".",
       );
-      context.fail();
-    },
-  );
+      context.succeed("All log records processed successfully");
+    }
+  } catch (err) {
+    console.log("Error: " + err.message);
+    console.log(
+      numDocsAdded + "of " + totLogLines + " log records added to ES.",
+    );
+    context.fail(err);
+  }
 }
 
 /* Lambda "main": Execution starts here */
