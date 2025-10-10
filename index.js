@@ -209,21 +209,7 @@ exports.handler = function (event, context) {
   var recordStream = new stream.Transform({ objectMode: true });
   recordStream._transform = function (line, encoding, done) {
     var logRecord = parser(line.toString());
-    // In case of ALB Flow Logs
-    if (logType === "alb") {
-      /* In case we get a 5xx we need to make sure that target_status_code
-       * and target_status_code_list are compliant with the data type that
-       * is defined in OpenSearch and they are set as float. By default AWS
-       * set them to '-' so we need to set them as null otherwise it won'this.
-       * be sent to OpenSearch
-      */
-      let keys = ["target_status_code", "target_status_code_list"]
-      for (let key of keys) {
-        if (logRecord[key] === "-") {
-          logRecord[key] = null;
-        }
-      }
-    }
+
     // In case of VPC Flow Logs
     if (logType === "vpc") {
       for (let key in logRecord) {
