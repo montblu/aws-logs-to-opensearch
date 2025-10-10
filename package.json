@@ -11,9 +11,8 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.665.0",
     "@opensearch-project/opensearch": "^3.5.1",
-    "alb-log-parser": "0.0.8",
     "byline": "4.2.1",
-    "vpc-flow-log-parser": "^0.0.3"
+    "moment": "^2.29.4"
   },
   "repository": "https://github.com/blmr/aws-elb-logs-to-elasticsearch.git",
   "license": "Amazon Software License"
