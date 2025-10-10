@@ -19,8 +19,8 @@
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { Client } = require('@opensearch-project/opensearch');
 var LineStream = require("byline").LineStream;
-var AlbLogParser = require("alb-log-parser"); // alb-log-parser  https://github.com/igtm/node-alb-log-parser
-var VpcFlowLogParser = require("vpc-flow-log-parser"); // vpc-flow-log-parser  https://github.com/toshihirock/node-vpc-flow-log-parser
+var AlbLogParser = require("./lib/alb-log-parser"); // local copy of alb-log-parser
+var VpcFlowLogParser = require("./lib/vpc-flow-log-parser"); // local copy of vpc-flow-log-parser
 var path = require("path");
 var stream = require("stream");
 const zlib = require("zlib");
