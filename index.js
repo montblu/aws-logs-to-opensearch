@@ -218,24 +218,31 @@ exports.handler = function (event, context) {
     // A stream of log records, from parsing each log line
     var recordStream = new stream.Transform({ objectMode: true });
     recordStream._transform = function (line, encoding, done) {
-      var logRecord = parser(line.toString());
+    var logRecord = parser(line.toString());
 
-      // Normalize fields: convert '-' or empty strings to null and coerce numeric strings
-      for (let key in logRecord) {
-        if (typeof logRecord[key] === 'string') {
-          const trimmed = logRecord[key].trim();
-          if (trimmed === '-' || trimmed === '') {
-            logRecord[key] = null;
-            continue;
-          }
-          const n = Number(trimmed);
-          if (!Number.isNaN(n) && trimmed !== '') {
-            logRecord[key] = Number.isInteger(n) ? parseInt(trimmed, 10) : n;
-          } else {
-            logRecord[key] = trimmed;
-          }
+    // If parser returned null (e.g., header lines), skip
+    if (!logRecord) {
+      done();
+      return;
+    }
+
+    // Normalize fields: convert '-' or empty strings to null and coerce numeric strings
+    for (let key in logRecord) {
+      if (typeof logRecord[key] === 'string') {
+        const trimmed = logRecord[key].trim();
+        if (trimmed === '-' || trimmed === '') {
+          logRecord[key] = null;
+          continue;
+        }
+        const n = Number(trimmed);
+        if (!Number.isNaN(n) && trimmed !== '') {
+          logRecord[key] = Number.isInteger(n) ? parseInt(trimmed, 10) : n;
+        } else {
+          logRecord[key] = trimmed;
         }
       }
+    }
+
 
       // In case of VPC Flow Logs
       if (logType === "vpc") {
