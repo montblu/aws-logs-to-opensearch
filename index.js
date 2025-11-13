@@ -175,9 +175,7 @@ async function postDocumentToES(doc, context) {
     }
   } catch (err) {
     console.log("Error: " + err.message);
-    console.log(
-      numDocsAdded + "of " + totLogLines + " log records added to ES.",
-    );
+    console.log(numDocsAdded + " of " + totLogLines + " log records added to ES.");
     context.fail(err);
   }
 }
