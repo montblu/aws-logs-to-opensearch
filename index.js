@@ -57,8 +57,7 @@ function getLogType(objPath) {
     console.log("Processing VPC Flow log file");
     return "vpc";
   } else {
-    console.log("Unknown log file type");
-    context.fail();
+    throw new Error("Unknown log file type for object path: " + objPath);
   }
 }
 
@@ -69,8 +68,7 @@ function getParser(logType) {
   } else if (logType === "vpc") {
     return VpcFlowLogParser;
   } else {
-    console.log("Unknown log type");
-    context.fail();
+    throw new Error("Unknown log type: " + logType);
   }
 }
 
@@ -177,9 +175,7 @@ async function postDocumentToES(doc, context) {
     }
   } catch (err) {
     console.log("Error: " + err.message);
-    console.log(
-      numDocsAdded + "of " + totLogLines + " log records added to ES.",
-    );
+    console.log(numDocsAdded + " of " + totLogLines + " log records added to ES.");
     context.fail(err);
   }
 }
@@ -195,8 +191,16 @@ exports.handler = function (event, context) {
   // Set parser
   parser = getParser(logType);
 
-  // Set the index name
-  index = indexPrefix + "-" + logType + "-" + indexTimestamp;
+  // Set the index name (use a fresh timestamp per invocation)
+  const invocationIndexTimestamp = new Date()
+    .toISOString()
+    .replace(/\-/g, ".")
+    .replace(/T.+/, "");
+  index = indexPrefix + "-" + logType + "-" + invocationIndexTimestamp;
+
+  // Reset counters per invocation
+  totLogLines = 0;
+  numDocsAdded = 0;
 
   /* == Streams ==
    * To avoid loading an entire (typically large) log file into memory,
@@ -204,60 +208,64 @@ exports.handler = function (event, context) {
    * from S3 to ES.
    * Flow: S3 file stream -> Log Line stream -> Log Record stream -> ES
    */
-  var lineStream = new LineStream();
-  // A stream of log records, from parsing each log line
-  var recordStream = new stream.Transform({ objectMode: true });
-  recordStream._transform = function (line, encoding, done) {
-    var logRecord = parser(line.toString());
-    // In case of ALB Flow Logs
-    if (logType === "alb") {
-      /* In case we get a 5xx we need to make sure that target_status_code
-       * and target_status_code_list are compliant with the data type that
-       * is defined in OpenSearch and they are set as float. By default AWS
-       * set them to '-' so we need to set them as null otherwise it won'this.
-       * be sent to OpenSearch
-      */
-      let keys = ["target_status_code", "target_status_code_list"]
-      for (let key of keys) {
-        if (logRecord[key] === "-") {
-          logRecord[key] = null;
-        }
-      }
-    }
-    // In case of VPC Flow Logs
-    if (logType === "vpc") {
-      for (let key in logRecord) {
-        if (typeof logRecord[key] === "string" && !isNaN(logRecord[key])) {
-          logRecord[key] = parseInt(logRecord[key], 10);
-        }
-      }
-      if (logRecord.start_utc !== "Invalid date") {
-        /*
-      We want to add the 'timestamp' field using 'start_utc' value
-      as VPC Flow Logs don't log a timestamp. We need this otherwise
-      OpenSearch will not be able to parse the timestamp field.
-      */
-        let startDateTime = new Date(logRecord.start_utc);
-        logRecord.timestamp = startDateTime.toISOString();
-        logRecord.request_creation_time = startDateTime.toISOString();
-      }
-    }
-    let dstPort = parseInt(logRecord.dstport);
-    if (
-      logType === "alb" ||
-      (logType === "vpc" && !VPCFlowLogsPorts) ||
-      (logType === "vpc" && destinationPortFilters.includes(dstPort))
-    ) {
-      var serializedRecord = JSON.stringify(logRecord);
-      this.push(serializedRecord);
-      totLogLines++;
-    }
-    done();
-  };
 
+  // Process each S3 record with its own streams to avoid interleaving
   event.Records.forEach(function (record) {
     var bucket = record.s3.bucket.name;
     var objKey = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
+
+    var lineStream = new LineStream();
+    // A stream of log records, from parsing each log line
+    var recordStream = new stream.Transform({ objectMode: true });
+    recordStream._transform = function (line, encoding, done) {
+    var logRecord = parser(line.toString());
+
+    // If parser returned null (e.g., header lines), skip
+    if (!logRecord) {
+      done();
+      return;
+    }
+
+    // Normalize fields: convert '-' or empty strings to null and coerce numeric strings
+    for (let key in logRecord) {
+      if (typeof logRecord[key] === 'string') {
+        const trimmed = logRecord[key].trim();
+        if (trimmed === '-' || trimmed === '') {
+          logRecord[key] = null;
+          continue;
+        }
+        const n = Number(trimmed);
+        if (!Number.isNaN(n) && trimmed !== '') {
+          logRecord[key] = Number.isInteger(n) ? parseInt(trimmed, 10) : n;
+        } else {
+          logRecord[key] = trimmed;
+        }
+      }
+    }
+
+
+      // In case of VPC Flow Logs
+      if (logType === "vpc") {
+        if (logRecord.start_utc !== "Invalid date" && logRecord.start_utc != null) {
+          let startDateTime = new Date(logRecord.start_utc);
+          logRecord.timestamp = startDateTime.toISOString();
+          logRecord.request_creation_time = startDateTime.toISOString();
+        }
+      }
+
+      let dstPort = parseInt(logRecord.dstport);
+      if (
+        logType === "alb" ||
+        (logType === "vpc" && !VPCFlowLogsPorts) ||
+        (logType === "vpc" && Array.isArray(destinationPortFilters) && destinationPortFilters.includes(dstPort))
+      ) {
+        // Push object (not JSON string) so types are preserved
+        this.push(logRecord);
+        totLogLines++;
+      }
+      done();
+    };
+
     s3LogsToES(bucket, objKey, context, lineStream, recordStream);
   });
 };
